@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TIC-TAC-TOE</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #282c34;
+      color: white;
+      overflow: hidden;
+    }
+
+    #gameTitle {
+      font-family: 'Comic Sans MS', cursive, sans-serif;
+      font-size: 36px;
+      margin-bottom: 20px;
+      align-self: flex-start;
+      margin-left: 20px;
+    }
+
+    #difficulty {
+      display: flex;
+      margin-bottom: 20px;
+    }
+
+    #difficulty label {
+      margin-right: 10px;
+    }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-gap: 4px;
+    }
+
+    .cell {
+      width: 100px;
+      height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: bold;
+      border: 2px solid #333;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .cell:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .cell.X {
+      color: #61dafb;
+    }
+
+    .cell.O {
+      color: #ff8c00;
+    }
+
+    @keyframes winAnimation {
+      0% {
+        transform: scale(1);
+        opacity: 0;
+      }
+      100% {
+        transform: scale(1.2);
+        opacity: 1;
+      }
+    }
+
+    .win {
+      animation: winAnimation 1s ease;
+    }
+
+    #winnerAnnouncement {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: #333;
+      padding: 20px;
+      border-radius: 10px;
+      display: none;
+      color: #fff;
+      z-index: 1; /* Ensure it's on top */
+    }
+
+    #resetButton {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #61dafb;
+      color: #282c34;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    #stats {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .stat-bar {
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      font-size: 16px;
+    }
+
+    .stat-bar span {
+      margin-right: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="gameTitle">TIC-TAC-TOE</div>
+  <div id="difficulty">
+    <label for="easy">Easy</label>
+    <input type="radio" id="easy" name="difficulty" value="easy" checked>
+    <label for="moderate">Moderate</label>
+    <input type="radio" id="moderate" name="difficulty" value="moderate">
+    <label for="hard">Hard</label>
+    <input type="radio" id="hard" name="difficulty" value="hard">
+  </div>
+  <div id="board"></div>
+  <div id="winnerAnnouncement"></div>
+  <button id="resetButton">Reset Game</button>
+  <div id="stats">
+    <div class="stat-bar">
+      <span>Wins:</span>
+      <span id="winCount">0</span>
+    </div>
+    <div class="stat-bar">
+      <span>Losses:</span>
+      <span id="lossCount">0</span>
+    </div>
+    <div class="stat-bar">
+      <span>Ties:</span>
+      <span id="tieCount">0</span>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const board = document.getElementById('board');
+      const winnerAnnouncement = document.getElementById('winnerAnnouncement');
+      const resetButton = document.getElementById('resetButton');
+      const winCountSpan = document.getElementById('winCount');
+      const lossCountSpan = document.getElementById('lossCount');
+      const tieCountSpan = document.getElementById('tieCount');
+      const difficultyRadios = document.querySelectorAll('input[name="difficulty"]');
+      const cells = [];
+      let currentPlayer = 'X';
+      let gameActive = true;
+      let winCount = 0;
+      let lossCount = 0;
+      let tieCount = 0;
+
+      // Create the board
+      for (let i = 0; i < 9; i++) {
+        const cell = document.createElement('div');
+        cell.classList.add('cell');
+        cell.dataset.index = i;
+        cell.addEventListener('click', handleCellClick);
+        cells.push(cell);
+        board.appendChild(cell);
+      }
+
+      // Handle cell click
+      function handleCellClick() {
+        if (!gameActive) return;
+
+        const index = this.dataset.index;
+
+        // Check if the cell is empty
+        if (cells[index].textContent === '') {
+          cells[index].textContent = currentPlayer;
+          cells[index].classList.add(currentPlayer);
+
+          // Check for a winner
+          if (checkWinner()) {
+            announceWinner();
+          } else if (checkDraw()) {
+            showAnnouncement("It's a draw!");
+            gameActive = false;
+            tieCount++;
+            tieCountSpan.textContent = tieCount;
+          } else {
+            // Switch player
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+
+            // AI makes a move
+            setTimeout(() => {
+              makeAIMove();
+            }, 500);
+          }
+        }
+      }
+
+      // Make a move for the AI
+      function makeAIMove() {
+        const difficulty = getSelectedDifficulty();
+        const emptyCells = cells.filter(cell => cell.textContent === '');
+        if (emptyCells.length > 0) {
+          let aiMove;
+          switch (difficulty) {
+            case 'easy':
+              aiMove = getRandomMove(emptyCells);
+              break;
+            case 'moderate':
+              aiMove = getModerateMove(emptyCells);
+              break;
+            case 'hard':
+              aiMove = getHardMove(emptyCells);
+              break;
+          }
+          aiMove.textContent = currentPlayer;
+          aiMove.classList.add(currentPlayer);
+
+          // Check for a winner after AI move
+          if (checkWinner()) {
+            announceWinner();
+            lossCount++;
+            lossCountSpan.textContent = lossCount;
+          } else if (checkDraw()) {
+            showAnnouncement("It's a draw!");
+            gameActive = false;
+            tieCount++;
+            tieCountSpan.textContent = tieCount;
+          } else {
+            // Switch player back to the human player
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+          }
+        }
+      }
+
+      // Get a random move
+      function getRandomMove(emptyCells) {
+        const randomIndex = Math.floor(Math.random() * emptyCells.length);
+        return emptyCells[randomIndex];
+      }
+
+      // Get a moderate move
+      function getModerateMove(emptyCells) {
+        // If the center is available, take it
+        const center = emptyCells.find(cell => cell.dataset.index === '4');
+        if (center) return center;
+
+        // Otherwise, choose a random move
+        return getRandomMove(emptyCells);
+      }
+
+      // Get a hard move (currently the same as moderate)
+      function getHardMove(emptyCells) {
+        return getModerateMove(emptyCells);
+      }
+
+      // Check for a winner
+      function checkWinner() {
+        const winningCombinations = [
+          [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+          [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+          [0, 4, 8], [2, 4, 6]             // Diagonals
+        ];
+
+        return winningCombinations.some(combination =>
+          cells[combination[0]].textContent !== '' &&
+          cells[combination[0]].textContent === cells[combination[1]].textContent &&
+          cells[combination[1]].textContent === cells[combination[2]].textContent
+        );
+      }
+
+      // Check for a draw
+      function checkDraw() {
+        return cells.every(cell => cell.textContent !== '');
+      }
+
+      // Display winner announcement
+      function announceWinner() {
+        const winnerPlayer = currentPlayer === 'X' ? 'Player X' : 'AI';
+        showAnnouncement(`${winnerPlayer} wins!`);
+        gameActive = false;
+        cells.forEach(cell => cell.classList.add('win'));
+        if (winnerPlayer === 'Player X') {
+          winCount++;
+          winCountSpan.textContent = winCount;
+        } else {
+          lossCount++;
+          lossCountSpan.textContent = lossCount;
+        }
+      }
+
+      // Show announcement on the page
+      function showAnnouncement(message) {
+        winnerAnnouncement.textContent = message;
+        winnerAnnouncement.style.display = 'block';
+        winnerAnnouncement.classList.add('win');
+      }
+
+      // Reset the game
+      resetButton.addEventListener('click', resetGame);
+
+      function resetGame() {
+        winnerAnnouncement.style.display = 'none';
+        cells.forEach(cell => {
+          cell.textContent = '';
+          cell.classList.remove('X', 'O', 'win');
+        });
+        gameActive = true;
+        currentPlayer = 'X';
+        choosePlayer.style.display = 'none';
+      }
+
+      // Get the selected difficulty
+      function getSelectedDifficulty() {
+        const selectedRadio = Array.from(difficultyRadios).find(radio => radio.checked);
+        return selectedRadio ? selectedRadio.value : 'easy';
+      }
+    });
+  </script>
+</body>
+</html>
+
